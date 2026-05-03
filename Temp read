@@ -1,0 +1,98 @@
+import serial
+import time
+import datetime
+import csv
+import sys
+import os
+
+# --- Config ---
+SERIAL_PORT = 'COM4'  # ESP port
+BAUD_RATE = 115200    # Micropython default baud rate
+LOG_FILE = 'temp_data_log.csv'
+LOG_INTERVAL_S = 1
+
+# --- Check/Create Log File and Header ---
+file_exists = os.path.isfile(LOG_FILE)
+if not file_exists:
+    print(f"Log file '{LOG_FILE}' not found, creating...")
+    try:
+        with open(LOG_FILE, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['Timestamp', 'Temperature_F'])  # Write header
+            print("Log file created with header.")
+    except IOError as e:
+        print(f"Error creating log file: {e}")
+        sys.exit(1)
+
+# --- Open Serial Port ---
+ser = None
+print(f"Connecting to {SERIAL_PORT} at {BAUD_RATE} baud...")
+try:
+    ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.5)
+    time.sleep(2)  # Allow connection to settle
+    ser.reset_input_buffer()
+    print(f"Connected to {ser.name}")
+except serial.SerialException as e:
+    print(f"Error opening serial port {SERIAL_PORT}: {e}")
+    sys.exit(1)
+except Exception as e:
+    print(f"Error occurred opening port: {e}")
+    sys.exit(1)
+
+# --- Main Logging Loop ---
+print("Logging data... Press Ctrl+C to exit.")
+try:
+    while True:
+        try:
+            if ser.in_waiting > 0:
+                line_bytes = ser.readline()
+                # Decode bytes to string and strip whitespace
+                line_str = line_bytes.decode('utf-8', errors='ignore').strip()
+                
+                if line_str:
+                    print(f"Raw Received <-- {line_str}")
+                    
+                    # --- Parse Data (expecting "temp_value") ---
+                    try:
+                        # Assuming the ESP sends just the number or comma-separated
+                        # If ESP sends "25.5", use: temp_f = float(line_str)
+                        # If ESP sends "temp,25.5", use: temp_f = float(line_str.split(',')[1])
+                        temp_f = float(line_str) 
+                        
+                        # Current Timestamp
+                        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        # --- Append to CSV ---
+                        with open(LOG_FILE, 'a', newline='') as f:
+                            writer = csv.writer(f)
+                            writer.writerow([timestamp, temp_f])
+                            print(f"Logged: {timestamp}, {temp_f:.1f} F")
+                            
+                    except ValueError as e:
+                        print(f"Could not convert received data to number: '{line_str}' ({e})")
+                    except Exception as e:
+                        print(f"Error processing data '{line_str}': {e}")
+            
+            # Wait before checking serial again
+            time.sleep(LOG_INTERVAL_S)
+
+        except serial.SerialException as e:
+            print(f"Serial communication error: {e}. Attempting to reconnect...")
+            if ser and ser.is_open:
+                ser.close()
+            time.sleep(5)
+            try:
+                ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=0.5)
+                time.sleep(2)
+                ser.reset_input_buffer()
+                print("Reconnected successfully.")
+            except serial.SerialException:
+                print("Reconnect failed. Check device connection.")
+                time.sleep(10)
+        except Exception as e:
+            print(f"Error in main loop: {e}")
+            time.sleep(1)
+
+except KeyboardInterrupt:
+    print("\nLogging stopped by user (Ctrl+C)")
+
