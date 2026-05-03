@@ -1,0 +1,88 @@
+# main.py - ESP32 Data Logger Device Code
+
+import machine 
+
+import time
+
+import sys
+
+import dht
+
+# --- Pin configuration ---
+
+TEMP_PIN = 34 # ADC Pin for DHT11 Vout
+
+LED_PIN = 4 # Pin for LED
+
+READ_INTERVAL_S = 60 # How often to read sensor
+
+# --- Setup ---
+
+try:
+    temp_adc = machine.ADC(machine.Pin(TEMP_PIN))
+    
+    temp_adc.atten(machine.ADC.ATTN_11DB)
+    
+    led = machine.Pin(LED_PIN, machine.Pin.OUT)
+    
+    led.off() # Start with LED off
+    
+    print (f"System initialized on Pin {TEMP_PIN} and pin {LED_PIN}")
+    
+except Exception as e:
+    
+    print (f"Error setting up hardware pins: {e}")
+    
+    print (f"Please check if pins are valid inputs for your board")
+    
+    # Do not exicute if pins are bad
+    
+    sys.exit()
+    
+# --- Main Loop ---
+
+print("Starting data logging loop...")
+
+while True:
+    
+    try:
+        
+        # --- Temp reading ---
+        
+        temp_raw = temp_adc.read_u16()
+        
+        temp_voltage = temp_raw * (3.3 / 65535)
+        
+        # Celsius calculation
+        temperature_c = (temp_voltage - 0.5) * 100.0
+        
+        # Fahrenheit conversion
+        temperature_f = (temperature_c * 1.8) + 32
+        
+        # --- LED control ---
+        
+        if temperature_f < 50:
+            led.value(1) # LED turns on
+        else:
+            led.value(0) # LED stays off
+            
+        # --- Format Data String (CSV format: Temp) ---
+        
+        data_string = f"{temperature_f:.1f}"
+        
+        # --- Print to Serial Output ---
+        
+        print(data_string)
+        
+    except Exception as e:
+        
+        print(f"Error in loop: {e}")
+        
+    # --- Wait for next reading ---
+    
+    time.sleep(READ_INTERVAL_S)
+
+
+        
+    
+    
