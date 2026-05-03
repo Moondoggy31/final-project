@@ -54,8 +54,10 @@ while True:
         temp_voltage = temp_raw * (3.3 / 65535)
         
         # Celsius calculation
-        temperature_c = (temp_voltage - 0.5) * 100.0
-        
+        temperature_c = (temp_voltage - 0.5) * 100.0 # Temp too high not accurate with this
+
+        temperature_c -= 252.0 # More accurate fo logging
+
         # Fahrenheit conversion
         temperature_f = (temperature_c * 1.8) + 32
         
