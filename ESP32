@@ -6,8 +6,6 @@ import time
 
 import sys
 
-import dht
-
 # --- Pin configuration ---
 
 TEMP_PIN = 34 # ADC Pin for DHT11 Vout
